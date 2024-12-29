@@ -1,0 +1,82 @@
+import argparse
+import subprocess
+import re
+import sys
+
+
+def get_current_ip(interface):
+    """Fetch the current IP address of the specified interface."""
+    try:
+        result = subprocess.check_output(["ip", "addr", "show", interface], text=True)
+        match = re.search(r'inet (\d+\.\d+\.\d+\.\d+)', result)
+        return match.group(1) if match else None
+    except subprocess.CalledProcessError:
+        print(f"Error: Unable to fetch IP for interface {interface}.")
+        sys.exit(1)
+
+
+def release_ip(interface):
+    """Release the current IP address using dhclient -r."""
+    try:
+        subprocess.run(["sudo", "dhclient", "-r", interface], check=True)
+        print(f"Released IP for {interface}.")
+    except subprocess.CalledProcessError:
+        print(f"Error: Unable to release IP for interface {interface}.")
+        sys.exit(1)
+
+
+def renew_ip(interface):
+    """Request a new IP address using dhclient."""
+    try:
+        subprocess.run(["sudo", "dhclient", interface], check=True)
+        print(f"Renewed IP for {interface}.")
+    except subprocess.CalledProcessError:
+        print(f"Error: Unable to renew IP for interface {interface}.")
+        sys.exit(1)
+
+
+def main():
+    # Set up argument parsing
+    parser = argparse.ArgumentParser(
+        description="Network Configuration Tool to release and renew IP addresses."
+    )
+    parser.add_argument(
+        "-r", "--release", action="store_true", help="Release the current IP address."
+    )
+    parser.add_argument(
+        "interface",
+        type=str,
+        help="The network interface for which the IP address needs to be changed.",
+    )
+
+    args = parser.parse_args()
+    interface = args.interface
+
+    # Get the current IP address
+    current_ip = get_current_ip(interface)
+    if current_ip:
+        print(f"Current IP for {interface}: {current_ip}")
+    else:
+        print(f"No IP assigned to {interface}.")
+
+    # Release IP if the -r flag is provided
+    if args.release:
+        release_ip(interface)
+
+    # Renew the IP address
+    renew_ip(interface)
+
+    # Fetch the new IP address
+    new_ip = get_current_ip(interface)
+    if new_ip:
+        print(f"New IP for {interface}: {new_ip}")
+    else:
+        print(f"No new IP assigned to {interface}.")
+
+    # Display the summary
+    print(f"Summary: Previous IP: {current_ip or 'None'}, New IP: {new_ip or 'None'}")
+
+
+if __name__ == "__main__":
+    main()
+
